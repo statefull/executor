@@ -161,16 +161,29 @@ namespace EXECUTOR
 
 		static ExecutorFactory * instance()
 		{
-			static ExecutorFactory instance;
-			return &instance;
+			static ExecutorFactory *instance = new ExecutorFactory();
+			count++;
+			return instance;
+		}
+
+		static void release()
+		{
+			count--;
+			if(count == 0)
+			{
+				delete instance();
+			}
 		}
 
 	private:
+		static int count;
 		ExecutorFactory() {}
 		~ExecutorFactory() {}
 		ExecutorFactory( const ExecutorFactory& other ) = delete;
 		ExecutorFactory& operator=( const ExecutorFactory& )  = delete;
 	};
+
+	int EXECUTOR::ExecutorFactory::count = 0;
 
 }
 
@@ -190,7 +203,6 @@ int main()
 	Test t;
 	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
 
-
 	ex->addWork(&w);
 	ex->addWork(&w1);
 	ex->addWork(&w);
@@ -201,4 +213,6 @@ int main()
 	ex->addWork(&w1);
 
 	factory->removeExecutor(ex);
+	factory->release();
+	usleep(10000);
 }
