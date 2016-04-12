@@ -12,18 +12,18 @@ namespace WORK
 	namespace HELPER
 	{
 	    template <int... Is>
-	    struct index {};
+		struct index {};
 
 	    template <int N, int... Is>
-	    struct gen_seq : gen_seq<N - 1, N - 1, Is...> {};
+		struct gen_seq : gen_seq<N - 1, N - 1, Is...> {};
 
 	    template <int... Is>
-	    struct gen_seq<0, Is...> : index<Is...> {};
+		struct gen_seq<0, Is...> : index<Is...> {};
 	}
 
 	class WorkInterface {
-	    public:
-	    virtual void execute() = 0;
+	public:
+		virtual void execute() = 0;
 	};
 
 	template <typename R, typename... Args>
@@ -36,16 +36,16 @@ namespace WORK
 		}
 	private:
 		template <typename... RArgs, int... Is>
-	    void func(std::tuple<RArgs...>& tup, HELPER::index<Is...>)
-	    {
-	        m_work(std::get<Is>(tup)...);
-	    }
+		void func(std::tuple<RArgs...>& tup, HELPER::index<Is...>)
+		{
+			m_work(std::get<Is>(tup)...);
+		}
 
 	    template <typename... RArgs>
-	    void func(std::tuple<RArgs...>& tup)
-	    {
-	        func(tup, HELPER::gen_seq<sizeof...(RArgs)>{});
-	    }
+		void func(std::tuple<RArgs...>& tup)
+		{
+			func(tup, HELPER::gen_seq<sizeof...(RArgs)>{});
+		}
 		std::function<R (Args... params)> m_work;
 		std::tuple<Args...> args;
 	};
@@ -54,18 +54,8 @@ namespace WORK
 namespace EXECUTOR
 {
 	class Executor {
+		friend class ExecutorFactory;
 	public:
-
-	    static Executor * createOrderedExecution()
-	    {
-	        return new Executor(true);
-	    }
-
-	    static Executor * createUnorderedExecution()
-	    {
-	        return new Executor(false);
-	    }
-
 
 		void addWork(WORK::WorkInterface *w)
 		{
@@ -76,12 +66,11 @@ namespace EXECUTOR
 			noData.notify_one();
 		}
 
-		~Executor() { stop(); }
-
 	private:
-	    Executor(bool ordered):m_ordered(ordered) { start(); }
+		Executor(bool ordered):m_ordered(ordered) { start(); }
+		~Executor() {}
 		Executor( const Executor& other ) = delete;
-        Executor& operator=( const Executor& )  = delete;
+		Executor& operator=( const Executor& )  = delete;
 
 		void start()
 		{
@@ -89,8 +78,7 @@ namespace EXECUTOR
 			if(!m_running)
 			{
 				m_running = true;
-				std::thread startThread(&EXECUTOR::Executor::execute,this);
-				std::swap(startThread, m_tEx);
+				m_tEx = std::thread(&EXECUTOR::Executor::execute,this);
 			}
 		}
 
@@ -101,7 +89,7 @@ namespace EXECUTOR
 				m_running = false;
 			}
 			noData.notify_one(); //to wake up if the thread is waiting
-			m_tEx.join();
+			m_tEx.detach();
 		}
 
 		void execute()
@@ -139,6 +127,8 @@ namespace EXECUTOR
 					}
 				}
 			}while(m_running || !m_works.empty());
+
+			delete this;
 		}
 
 		std::vector<WORK::WorkInterface *> m_works;
@@ -150,6 +140,38 @@ namespace EXECUTOR
 		bool m_running = false;
 		bool m_ordered = true;
 	};
+
+
+	class ExecutorFactory {
+	public:
+		Executor * createOrderedExecution()
+		{
+			return new Executor(true);
+		}
+
+		Executor * createUnorderedExecution()
+		{
+			return new Executor(false);
+		}
+
+		void removeExecutor(Executor *executor)
+		{
+			executor->stop();
+		}
+
+		static ExecutorFactory * instance()
+		{
+			static ExecutorFactory instance;
+			return &instance;
+		}
+
+	private:
+		ExecutorFactory() {}
+		~ExecutorFactory() {}
+		ExecutorFactory( const ExecutorFactory& other ) = delete;
+		ExecutorFactory& operator=( const ExecutorFactory& )  = delete;
+	};
+
 }
 
 class Test {
@@ -161,30 +183,22 @@ public:
 
 int main()
 {
-    EXECUTOR::Executor * ex = EXECUTOR::Executor::createOrderedExecution();
-    EXECUTOR::Executor * ex1 = EXECUTOR::Executor::createUnorderedExecution();
+	EXECUTOR::ExecutorFactory *factory = EXECUTOR::ExecutorFactory::instance();
+	EXECUTOR::Executor * ex = factory->createUnorderedExecution();
 
-    WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
-    Test t;
-    WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
-    ex->addWork(&w);
-    ex->addWork(&w1);
-    ex->addWork(&w);
-    ex->addWork(&w1);
-    ex->addWork(&w);
-    ex->addWork(&w1);
-    ex->addWork(&w);
-    ex->addWork(&w1);
+	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
+	Test t;
+	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
 
-    ex1->addWork(&w);
-    ex1->addWork(&w1);
-    ex1->addWork(&w);
-    ex1->addWork(&w1);
-    ex1->addWork(&w);
-    ex1->addWork(&w1);
-    ex1->addWork(&w);
-    ex1->addWork(&w1);
 
-    delete ex;
-    delete ex1;
+	ex->addWork(&w);
+	ex->addWork(&w1);
+	ex->addWork(&w);
+	ex->addWork(&w1);
+	ex->addWork(&w);
+	ex->addWork(&w1);
+	ex->addWork(&w);
+	ex->addWork(&w1);
+
+	factory->removeExecutor(ex);
 }
