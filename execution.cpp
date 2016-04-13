@@ -26,22 +26,24 @@ namespace WORK
 	class WorkInterface {
 	public:
 		virtual void execute() = 0;
+		virtual std::future<bool> getExecutionConfirmation() = 0;
 	};
 
 	template <typename R, typename... Args>
 	class Work: public WorkInterface {
 	public:
-		Work(std::function<R (Args... params)> work, Args... params, std::promise<bool> *workFinished = nullptr): m_work(work), args(std::forward<Args>(params)...), m_workFinished(workFinished)  {}
+		Work(std::function<R (Args... params)> work, Args... params): m_work(work), args(std::forward<Args>(params)...) {}
 		~Work() {}
 		void execute() {
 			func(args);
 		}
+		std::future<bool> getExecutionConfirmation() { return m_workFinished.get_future(); }
 	private:
 		template <typename... RArgs, int... Is>
 		void func(std::tuple<RArgs...>& tup, HELPER::index<Is...>)
 		{
 			m_work(std::get<Is>(tup)...);
-			if(m_workFinished) { m_workFinished->set_value(true); }
+			m_workFinished.set_value(true);
 		}
 
 	    template <typename... RArgs>
@@ -51,7 +53,7 @@ namespace WORK
 		}
 		std::function<R (Args... params)> m_work;
 		std::tuple<Args...> args;
-		std::promise<bool> *m_workFinished;
+		std::promise<bool> m_workFinished;
 	};
 }
 
@@ -165,11 +167,11 @@ namespace EXECUTOR
 
 		static ExecutorFactory & instance()
 		{
-			static ExecutorFactory instance;			
+			static ExecutorFactory instance;
 			return instance;
 		}
 
-	private:	
+	private:
 		ExecutorFactory() {}
 		~ExecutorFactory() {}
 		ExecutorFactory( const ExecutorFactory& other ) = delete;
@@ -187,20 +189,17 @@ public:
 int main()
 {
 	EXECUTOR::Executor * ex = EXECUTOR::ExecutorFactory::instance().createUnorderedExecution();
+	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
 
-	std::promise<bool> promise;
-
-	std::future<bool> fut = promise.get_future();
+	std::future<bool> fut = w.getExecutionConfirmation();
 
 	std::function<void()> workFinished = [&fut] () {
 		if(fut.get()) { std::cout << "work finished" << std::endl; }
 	};
 
-	std::thread waitWork(workFinished);
-	waitWork.detach();
-  	
-	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15,&promise);
-	
+	std::thread(workFinished).detach();
+
+
 	Test t;
 	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
 
