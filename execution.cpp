@@ -26,24 +26,23 @@ namespace WORK
 	class WorkInterface {
 	public:
 		virtual void execute() = 0;
-		virtual std::future<bool> getExecutionConfirmation() = 0;
+		virtual void setExecutionConfirmation(std::promise<bool> *promise) = 0;
 	};
 
 	template <typename R, typename... Args>
 	class Work: public WorkInterface {
 	public:
-		Work(std::function<R (Args... params)> work, Args... params): m_work(work), args(std::forward<Args>(params)...) {}
+		Work(std::function<R (Args... params)> work, Args... params): m_work(work), args(std::forward<Args>(params)...), m_workFinished(nullptr) {}
 		~Work() {}
 		void execute() {
 			func(args);
 		}
-		std::future<bool> getExecutionConfirmation() { return m_workFinished.get_future(); }
 	private:
 		template <typename... RArgs, int... Is>
 		void func(std::tuple<RArgs...>& tup, HELPER::index<Is...>)
 		{
 			m_work(std::get<Is>(tup)...);
-			m_workFinished.set_value(true);
+			if(m_workFinished) { m_workFinished->set_value(true); }
 		}
 
 	    template <typename... RArgs>
@@ -51,9 +50,15 @@ namespace WORK
 		{
 			func(tup, HELPER::gen_seq<sizeof...(RArgs)>{});
 		}
+
+		void setExecutionConfirmation(std::promise<bool> *promise)
+		{
+			m_workFinished = promise;
+		}
+
 		std::function<R (Args... params)> m_work;
 		std::tuple<Args...> args;
-		std::promise<bool> m_workFinished;
+		std::promise<bool> *m_workFinished;
 	};
 }
 
@@ -63,13 +68,16 @@ namespace EXECUTOR
 		friend class ExecutorFactory;
 	public:
 
-		void addWork(WORK::WorkInterface *w)
+		std::future<bool> addWork(WORK::WorkInterface *w)
 		{
 			{
 				std::lock_guard<std::mutex> guard(m_mutexWorks);
 				m_works.push_back(w);
 			}
+			std::promise<bool> *promise = new std::promise<bool>();
+			w->setExecutionConfirmation(promise);
 			noData.notify_one();
+			return promise->get_future();
 		}
 
 	private:
@@ -191,19 +199,22 @@ int main()
 	EXECUTOR::Executor * ex = EXECUTOR::ExecutorFactory::instance().createUnorderedExecution();
 	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
 
-	std::future<bool> fut = w.getExecutionConfirmation();
+	Test t;
+	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
+
+	std::future<bool> fut = ex->addWork(&w);
+	std::future<bool> fut2 = ex->addWork(&w1);
 
 	std::function<void()> workFinished = [&fut] () {
 		if(fut.get()) { std::cout << "work finished" << std::endl; }
 	};
 
+	std::function<void()> workFinished2 = [&fut2] () {
+		if(fut2.get()) { std::cout << "work finished 2" << std::endl; }
+	};
+
 	std::thread(workFinished).detach();
-
-
-	Test t;
-	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
-
-	ex->addWork(&w);
+	std::thread(workFinished2).detach();
 
 	EXECUTOR::ExecutorFactory::instance().removeExecutor(ex);
 	usleep(10000);
