@@ -154,37 +154,23 @@ namespace EXECUTOR
 			return new Executor(false);
 		}
 
-		void removeExecutor(Executor *executor)
+		static void removeExecutor(Executor *executor)
 		{
 			executor->stop();
 		}
 
-		static ExecutorFactory * instance()
+		static ExecutorFactory & instance()
 		{
-			static ExecutorFactory *instance = new ExecutorFactory();
-			count++;
+			static ExecutorFactory instance;			
 			return instance;
 		}
 
-		static void release()
-		{
-			count--;
-			if(count == 0)
-			{
-				delete instance();
-			}
-		}
-
-	private:
-		static int count;
+	private:	
 		ExecutorFactory() {}
 		~ExecutorFactory() {}
 		ExecutorFactory( const ExecutorFactory& other ) = delete;
 		ExecutorFactory& operator=( const ExecutorFactory& )  = delete;
 	};
-
-	int EXECUTOR::ExecutorFactory::count = 0;
-
 }
 
 class Test {
@@ -196,8 +182,7 @@ public:
 
 int main()
 {
-	EXECUTOR::ExecutorFactory *factory = EXECUTOR::ExecutorFactory::instance();
-	EXECUTOR::Executor * ex = factory->createUnorderedExecution();
+	EXECUTOR::Executor * ex = EXECUTOR::ExecutorFactory::instance().createUnorderedExecution();	 
 
 	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
 	Test t;
@@ -212,7 +197,6 @@ int main()
 	ex->addWork(&w);
 	ex->addWork(&w1);
 
-	factory->removeExecutor(ex);
-	factory->release();
+	EXECUTOR::ExecutorFactory::instance().removeExecutor(ex);
 	usleep(10000);
 }
