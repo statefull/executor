@@ -5,6 +5,8 @@
 #include <vector>
 #include <mutex>
 #include <condition_variable>
+#include <future>
+#include <memory>
 #include <unistd.h>
 
 namespace WORK
@@ -29,7 +31,7 @@ namespace WORK
 	template <typename R, typename... Args>
 	class Work: public WorkInterface {
 	public:
-		Work(std::function<R (Args... params)> work, Args... params): m_work(work), args(std::forward<Args>(params)...) {}
+		Work(std::function<R (Args... params)> work, Args... params, std::promise<bool> *workFinished = nullptr): m_work(work), args(std::forward<Args>(params)...),m_workFinished(workFinished)  {}
 		~Work() {}
 		void execute() {
 			func(args);
@@ -48,6 +50,7 @@ namespace WORK
 		}
 		std::function<R (Args... params)> m_work;
 		std::tuple<Args...> args;
+		std::promise<bool> *m_workFinished;
 	};
 }
 
@@ -182,20 +185,25 @@ public:
 
 int main()
 {
-	EXECUTOR::Executor * ex = EXECUTOR::ExecutorFactory::instance().createUnorderedExecution();	 
+	EXECUTOR::Executor * ex = EXECUTOR::ExecutorFactory::instance().createUnorderedExecution();
 
-	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15);
+	std::promise<bool> promise;
+
+	std::future<bool> fut = promise.get_future();
+
+	std::function<void()> workFinished = [&fut] () {
+		if(fut.get()) { std::cout << "work finished" << std::endl; }
+	};
+
+	std::thread waitWork(workFinished);
+	waitWork.detach();
+  	
+	WORK::Work<void,int,int> w([] (int a,int b) -> void { std::cout << a << b; },12,15,&promise);
+	
 	Test t;
 	WORK::Work<void> w1(std::bind(&Test::print,t,"hola"));
 
 	ex->addWork(&w);
-	ex->addWork(&w1);
-	ex->addWork(&w);
-	ex->addWork(&w1);
-	ex->addWork(&w);
-	ex->addWork(&w1);
-	ex->addWork(&w);
-	ex->addWork(&w1);
 
 	EXECUTOR::ExecutorFactory::instance().removeExecutor(ex);
 	usleep(10000);
