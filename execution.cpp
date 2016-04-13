@@ -31,7 +31,7 @@ namespace WORK
 	template <typename R, typename... Args>
 	class Work: public WorkInterface {
 	public:
-		Work(std::function<R (Args... params)> work, Args... params, std::promise<bool> *workFinished = nullptr): m_work(work), args(std::forward<Args>(params)...),m_workFinished(workFinished)  {}
+		Work(std::function<R (Args... params)> work, Args... params, std::promise<bool> *workFinished = nullptr): m_work(work), args(std::forward<Args>(params)...), m_workFinished(workFinished)  {}
 		~Work() {}
 		void execute() {
 			func(args);
@@ -41,6 +41,7 @@ namespace WORK
 		void func(std::tuple<RArgs...>& tup, HELPER::index<Is...>)
 		{
 			m_work(std::get<Is>(tup)...);
+			if(m_workFinished) { m_workFinished->set_value(true); }
 		}
 
 	    template <typename... RArgs>
