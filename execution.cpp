@@ -81,7 +81,7 @@ namespace EXECUTOR
 		}
 
 	private:
-		Executor(bool ordered):m_ordered(ordered),m_waitForDestroy(false) { start(); }
+		Executor(bool ordered):m_ordered(ordered), m_waitForDestroy(false), m_running(false) { start(); }
 		~Executor() {}
 		Executor( const Executor& other ) = delete;
 		Executor& operator=( const Executor& )  = delete;
@@ -153,8 +153,8 @@ namespace EXECUTOR
 		mutable std::mutex m_mutexExecutor;
 		std::condition_variable noData;
 		std::thread m_tEx;
-		bool m_running = false;
-		bool m_ordered = true;
+		bool m_running;
+		bool m_ordered;
 		bool m_waitForDestroy;
 	};
 
