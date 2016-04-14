@@ -81,7 +81,7 @@ namespace EXECUTOR
 		}
 
 	private:
-		Executor(bool ordered):m_ordered(ordered) { start(); }
+		Executor(bool ordered):m_ordered(ordered),m_waitForDestroy(false) { start(); }
 		~Executor() {}
 		Executor( const Executor& other ) = delete;
 		Executor& operator=( const Executor& )  = delete;
@@ -96,14 +96,16 @@ namespace EXECUTOR
 			}
 		}
 
-		void stop()
+		void stop(bool wait = false)
 		{
 			{
 				std::lock_guard<std::mutex> guardExecutor(m_mutexExecutor);
 				m_running = false;
+				m_waitForDestroy = wait;
 			}
 			noData.notify_one(); //to wake up if the thread is waiting
-			m_tEx.detach();
+			if(wait) { m_tEx.join(); delete this; } //wait until all works have been executed
+			else { m_tEx.detach(); }
 		}
 
 		void execute()
@@ -142,7 +144,7 @@ namespace EXECUTOR
 				}
 			}while(m_running || !m_works.empty());
 
-			delete this;
+			if(!m_waitForDestroy) { delete this; }
 		}
 
 		std::vector<WORK::WorkInterface *> m_works;
@@ -153,6 +155,7 @@ namespace EXECUTOR
 		std::thread m_tEx;
 		bool m_running = false;
 		bool m_ordered = true;
+		bool m_waitForDestroy;
 	};
 
 
@@ -168,7 +171,12 @@ namespace EXECUTOR
 			return new Executor(false);
 		}
 
-		static void removeExecutor(Executor *executor)
+		static void removeExecutorWaiting(Executor *executor)
+		{
+			executor->stop(true);
+		}
+
+		static void removeExecutorNoWaiting(Executor *executor)
 		{
 			executor->stop();
 		}
@@ -216,6 +224,8 @@ int main()
 	std::thread(workFinished).detach();
 	std::thread(workFinished2).detach();
 
-	EXECUTOR::ExecutorFactory::instance().removeExecutor(ex);
+	EXECUTOR::ExecutorFactory::instance().removeExecutorNoWaiting(ex);
+
 	usleep(10000);
+
 }
