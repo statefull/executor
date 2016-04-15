@@ -86,7 +86,7 @@ namespace EXECUTOR
 		}
 
 	private:
-		Executor(bool ordered):m_ordered(ordered), m_waitForDestroy(false), m_running(false), m_promiseIndex(0) { start(); }
+		Executor(bool ordered):m_running(false), m_ordered(ordered), m_waitForDestroy(false), m_promiseIndex(0) { start(); }
 		~Executor() {}
 		Executor( const Executor& other ) = delete;
 		Executor& operator=( const Executor& )  = delete;
