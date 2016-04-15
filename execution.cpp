@@ -27,8 +27,8 @@ namespace WORK
 
 	class WorkInterface {
 	public:
-		virtual void execute(int index = 0) = 0;
-		virtual void setExecutionConfirmation(std::promise<bool> *promise, int index = 0) = 0;
+		virtual void execute(unsigned int index = 0) = 0;
+		virtual void setExecutionConfirmation(std::promise<bool> *promise, unsigned int index = 0) = 0;
 	};
 
 	template <typename R, typename... Args>
@@ -36,7 +36,7 @@ namespace WORK
 	public:
 		Work(std::function<R (Args... params)> work, Args... params): m_work(work), args(std::forward<Args>(params)...) {}
 		~Work() {}
-		void execute(int index = 0) {
+		void execute(unsigned int index = 0) {
 			func(args, index);			
 		}
 	private:
@@ -53,14 +53,14 @@ namespace WORK
 			func(tup, HELPER::gen_seq<sizeof...(RArgs)>{}, index);
 		}
 
-		void setExecutionConfirmation(std::promise<bool> *promise, int index = 0)
+		void setExecutionConfirmation(std::promise<bool> *promise, unsigned int index = 0)
 		{
 			m_workFinished[index] = promise;
 		}
 
 		std::function<R (Args... params)> m_work;
 		std::tuple<Args...> args;
-		std::map<int,std::promise<bool>*> m_workFinished;
+		std::map<unsigned int,std::promise<bool>*> m_workFinished;
 	};
 }
 
