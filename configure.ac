@@ -3,11 +3,14 @@
 
 AC_PREREQ([2.69])
 AC_INIT(executor, 1.0, statefull@gmail.com)
-AC_CONFIG_SRCDIR([src])
+AC_CONFIG_SRCDIR([src/executor.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 EXECUTOR_CPPFLAGS="-I../includes --pedantic -Wall -std=c++11 -pthread"
 AC_SUBST(EXECUTOR_CPPFLAGS)
+TESTS_CPPFLAGS="-I../../includes -L../.libs/ -lexecutor --pedantic -Wall -std=c++11 -pthread"
+AC_SUBST(TESTS_CPPFLAGS)
+
 
 # Checks for programs.
 AC_PROG_CXX
@@ -26,4 +29,4 @@ AM_INIT_AUTOMAKE
 # Checks for library functions.
 LT_INIT
 
-AC_OUTPUT(Makefile src/Makefile)
+AC_OUTPUT(Makefile src/Makefile src/tests/Makefile)
