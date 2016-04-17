@@ -5,7 +5,7 @@
 #include <condition_variable>
 #include <queue>
 #include <mutex>
-#include "work.h"
+#include <work.h>
 
 namespace EXECUTOR
 {
