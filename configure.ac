@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT(executor, 1.0, statefull@gmail.com)
-AC_CONFIG_SRCDIR([src/execution.cpp])
+AC_CONFIG_SRCDIR([src/executor.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -16,10 +16,11 @@ AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
-
 # Checks Makefile
 AM_INIT_AUTOMAKE
 
+
 # Checks for library functions.
+LT_INIT
 
 AC_OUTPUT(Makefile src/Makefile)
